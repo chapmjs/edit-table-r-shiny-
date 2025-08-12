@@ -1,37 +1,100 @@
 library(shiny)
 library(DT)
 
-# Sample data
+# Sample data - small test dataset
 sample_data <- data.frame(
-  ID = 1:5,
-  Name = c("Alice", "Bob", "Charlie", "Diana", "Eve"),
-  Age = c(25, 30, 35, 28, 32),
-  Department = c("HR", "IT", "Finance", "Marketing", "IT"),
-  Salary = c(50000, 75000, 65000, 55000, 70000),
+  ID = 1:4,
+  Product = c("Laptop", "Mouse", "Keyboard", "Monitor"),
+  Price = c(999.99, 29.99, 79.99, 249.99),
+  Stock = c(15, 50, 30, 8),
+  Category = c("Electronics", "Accessories", "Accessories", "Electronics"),
   stringsAsFactors = FALSE
 )
 
-# Define UI
+# Define UI - Simplified for Posit Connect
 ui <- fluidPage(
-  titlePanel("Editable Table Example"),
-  
-  fluidRow(
-    column(12,
-      h4("Double-click any cell to edit it"),
-      br(),
-      DT::dataTableOutput("editable_table"),
-      br(),
-      h4("Current Data:"),
-      verbatimeTextOutput("current_data")
-    )
+  # Basic meta tags only
+  tags$head(
+    tags$meta(name = "viewport", 
+             content = "width=device-width, initial-scale=1, shrink-to-fit=no"),
+    
+    # Custom CSS for better appearance
+    tags$style(HTML("
+      @media (max-width: 768px) {
+        .container-fluid {
+          padding: 10px;
+        }
+        .btn-block {
+          margin-bottom: 10px;
+        }
+        .dataTables_wrapper {
+          font-size: 12px;
+        }
+      }
+      
+      .alert-info {
+        background-color: #d1ecf1;
+        border-color: #bee5eb;
+        color: #0c5460;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+      }
+      
+      .table-container {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 20px;
+        margin-bottom: 20px;
+      }
+    "))
   ),
   
-  fluidRow(
-    column(6,
-      actionButton("save_data", "Save Changes", class = "btn-success")
+  titlePanel("Editable Product Inventory Table"),
+  
+  div(class = "container-fluid",
+    fluidRow(
+      column(12,
+        div(class = "alert alert-info",
+          HTML("<strong>📝 Instructions:</strong> Double-click any cell (except ID) to edit it. 
+               Press Enter to save your changes.")
+        )
+      )
     ),
-    column(6,
-      actionButton("reset_data", "Reset to Original", class = "btn-warning")
+    
+    fluidRow(
+      column(12,
+        div(class = "table-container",
+          DT::dataTableOutput("editable_table")
+        )
+      )
+    ),
+    
+    fluidRow(
+      column(4,
+        actionButton("save_data", "💾 Save Changes", 
+                    class = "btn-success btn-block")
+      ),
+      column(4,
+        actionButton("reset_data", "↶ Reset to Original", 
+                    class = "btn-warning btn-block")
+      ),
+      column(4,
+        actionButton("add_row", "➕ Add New Product", 
+                    class = "btn-primary btn-block")
+      )
+    ),
+    
+    br(),
+    
+    fluidRow(
+      column(12,
+        h4("📊 Current Data Preview:"),
+        div(style = "background: #f8f9fa; padding: 15px; border-radius: 5px; border-left: 4px solid #007bff;",
+          verbatimeTextOutput("current_data")
+        )
+      )
     )
   )
 )
@@ -53,31 +116,78 @@ server <- function(input, output, session) {
         disable = list(columns = c(0))  # Disable editing for ID column (0-indexed)
       ),
       options = list(
-        pageLength = 10,
+        pageLength = 15,
         scrollX = TRUE,
-        dom = 'Bfrtip'
+        dom = 'Bfrtip',
+        buttons = c('copy', 'csv'),
+        columnDefs = list(
+          list(className = "dt-center", targets = c(0, 2, 3)),  # Center align ID, Price, Stock
+          list(width = "80px", targets = c(0, 3)),              # Set width for ID and Stock
+          list(width = "100px", targets = 2)                    # Set width for Price
+        ),
+        initComplete = JS(
+          "function(settings, json) {",
+          "$(this.api().table().header()).css({'background-color': '#337ab7', 'color': '#fff'});",
+          "}"
+        )
       ),
-      rownames = FALSE
-    )
+      rownames = FALSE,
+      class = "display table-striped table-hover"
+    ) %>%
+      DT::formatCurrency("Price", currency = "$", digits = 2) %>%
+      DT::formatStyle(
+        "Stock",
+        backgroundColor = DT::styleInterval(c(10, 25), c("#ffcccc", "#ffffcc", "#ccffcc"))
+      )
   })
   
   # Handle cell editing
   observeEvent(input$editable_table_cell_edit, {
     info <- input$editable_table_cell_edit
     
-    # Get the edited value
+    # Get the edited information
     row_num <- info$row
     col_num <- info$col + 1  # DT uses 0-indexed columns, R uses 1-indexed
     new_value <- info$value
+    col_name <- names(values$data)[col_num]
+    
+    # Type conversion based on column
+    if (col_name == "Price") {
+      new_value <- as.numeric(new_value)
+    } else if (col_name == "Stock") {
+      new_value <- as.integer(new_value)
+    }
     
     # Update the data
     values$data[row_num, col_num] <- new_value
     
-    # Show a brief notification
+    # Show notification with better formatting
     showNotification(
-      paste("Cell updated: Row", row_num, "Column", names(values$data)[col_num]),
+      paste0("✅ Updated ", col_name, " for ", values$data[row_num, "Product"], 
+             " to: ", new_value),
       type = "message",
-      duration = 2
+      duration = 3
+    )
+  })
+  
+  # Add new row functionality
+  observeEvent(input$add_row, {
+    new_id <- max(values$data$ID) + 1
+    new_row <- data.frame(
+      ID = new_id,
+      Product = "New Product",
+      Price = 0.00,
+      Stock = 0,
+      Category = "Uncategorized",
+      stringsAsFactors = FALSE
+    )
+    
+    values$data <- rbind(values$data, new_row)
+    
+    showNotification(
+      "➕ New row added! Double-click cells to edit.",
+      type = "success",
+      duration = 3
     )
   })
   
@@ -86,25 +196,25 @@ server <- function(input, output, session) {
     values$data
   })
   
-  # Save data action (in real app, you'd save to file/database)
+  # Save data action
   observeEvent(input$save_data, {
-    # Here you would typically save to a file or database
-    # For this example, we'll just show a notification
+    # For Posit Connect, we'll show the save action but won't actually write files
+    # since file system access may be restricted
     showNotification(
-      "Data saved successfully!",
+      "💾 Data changes saved to session! In production, this would save to database.",
       type = "success",
-      duration = 3
+      duration = 4
     )
     
-    # Optionally, you could save to CSV:
-    # write.csv(values$data, "saved_data.csv", row.names = FALSE)
+    # You can add actual save logic here based on your deployment needs
+    # For example: database connection, API calls, etc.
   })
   
   # Reset data to original
   observeEvent(input$reset_data, {
     values$data <- values$original_data
     showNotification(
-      "Data reset to original values",
+      "↶ Data reset to original values",
       type = "warning",
       duration = 3
     )
