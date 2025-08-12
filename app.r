@@ -92,7 +92,7 @@ ui <- fluidPage(
       column(12,
         h4("📊 Current Data Preview:"),
         div(style = "background: #f8f9fa; padding: 15px; border-radius: 5px; border-left: 4px solid #007bff;",
-          verbatimeTextOutput("current_data")
+          verbatimTextOutput("current_data")
         )
       )
     )
