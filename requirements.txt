@@ -1,0 +1,19 @@
+# R Package Requirements for Shiny Editable Table App
+# Install these packages using: install.packages(c("shiny", "DT"))
+
+# Required packages:
+# shiny - Web application framework for R
+# DT - R interface to the jQuery DataTables library
+
+# To install all required packages, run:
+install.packages(c("shiny", "DT"))
+
+# Alternative installation method:
+# if (!require("shiny")) install.packages("shiny")
+# if (!require("DT")) install.packages("DT")
+
+# For package management, you can also use renv:
+# install.packages("renv")
+# renv::init()
+# renv::install(c("shiny", "DT"))
+# renv::snapshot()
